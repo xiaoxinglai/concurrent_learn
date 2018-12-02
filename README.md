@@ -1,14 +1,8 @@
 # concurrent_learn
-java并发练习笔记
-
- * [concurrent_learn](#concurrent_learn)
-               * [java并发编程实战之从因数分解看多线程](#java并发编程实战之从因数分解看多线程)
-               * [java并发编程实战从因数分解看多线程（下）](#java并发编程实战从因数分解看多线程下)
-            * [Furture](#furture)
-         * [Furture的demo](#furture的demo)
+#java并发练习笔记
 
 
-##### java并发编程实战之从因数分解看多线程
+## java并发编程实战之从因数分解看多线程
 ***
 这篇博文主要通过对多个大数的因数分解进行实践，进而引出初步的多线程的一些用法和思考。
 
@@ -375,7 +369,7 @@ public class factorsService {
 
 
 
-##### java并发编程实战从因数分解看多线程（下）
+## java并发编程实战从因数分解看多线程（下）
 ***
 [java并发编程实战之从因数分解看多线程(上)](https://blog.csdn.net/qq_20009015/article/details/82847839)
 从之前的那篇文章中我们已经验证了多线程可以显著提高程序的效率，但并非没有限制。那么要如何才能更进一步的提升这个程序的效率，答案是利用缓存。  
@@ -603,12 +597,12 @@ get为原子操作情况下，竞态条件是消除了，但是下面的运算�
 ***理想状态，判断条件同一个时刻只有一个线程在执行，并且如果发现任务已经在执行了，则等待该任务，而不是自己去计算，因此使用furture是非常合适的***
 
 
-#### Furture
+### Furture
 > 在并发编程中，我们经常用到非阻塞的模型，在之前的多线程的三种实现中，不管是继承thread类还是实现runnable接口，都无法保证获取到之前的执行结果。通过实现Callback接口，并用Future可以来接收多线程的执行结果。
  Future表示一个可能还没有完成的异步任务的结果，针对这个结果可以添加Callback以便在任务执行成功或失败后作出相应的操作。
  
  
- ### Furture的demo
+#### Furture的demo
  
  ***建立实现了callable接口的任务类***
  ```
@@ -961,6 +955,7 @@ public class factorsThread implements Runnable {
 
 
 
+## 从赛马游戏看CyclicBarrier，从斗地主看CountDownLatch
 
 `CyclicBarrier`是栅栏，效果就是让多个线程都执行到某个指定的点之后，再一起继续执行。与`CountDownLatch`有点类似，最大的区别是`CyclicBarrier`可以循环使用。
 
