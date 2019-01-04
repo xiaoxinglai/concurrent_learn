@@ -37,7 +37,7 @@
 ////        Long beginT = System.currentTimeMillis();
 ////        for (Long num : nums) {
 ////            factorsThread.setNum(num);
-////            Thread thread = new Thread(factorsThread);
+////            ThreadDemo thread = new ThreadDemo(factorsThread);
 ////            thread.start();
 ////        }
 ////

@@ -34,7 +34,7 @@ public class factorsService {
 //            if (cache.get(i) == null) {
 //                factorsTask factorsTask = new factorsTask(i);
 //                FutureTask<List<Long>> future = new FutureTask<List<Long>>(factorsTask);
-//                Thread t1 = new Thread(future);
+//                ThreadDemo t1 = new ThreadDemo(future);
 //                t1.start();
 //                System.out.println("放入到缓存中");
 //                cache.put(start, future);

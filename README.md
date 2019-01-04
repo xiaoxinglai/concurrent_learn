@@ -1195,4 +1195,163 @@ Horse 5 won!
 
 执行`barrier.await();`的线程进行等待，直到所有计数器到达设置的值，然后继续执行下一轮。
 
+## 为什么要用线程池
+1.为什么要用线程池  
+多线程的情况下确实可以最大限度发挥多核处理器的计算能力，提高系统的吞吐量和性能。但是如果随意使用线程，对系统的性能反而有不利影响。  
+
+比如说
+```
+ new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+```
+
+这样直接创建线程，在简单应用里面看起来没有问题，创建了一个线程，并且在run()方法结束后自动回收该线程。但是如果在真实系统里面，可能会由于业务情况，开启了很多线程，当线程数量多大时，反而会耗尽cpu和内存资源。  
+
+比如说，创建和销毁线程也需要时间，如果创建和销毁的时间远大于线程执行的时间，反而得不偿失。  
+其次线程也需要占用内存空间，大量的线程会抢占宝贵的内存资源，可能会导致out of memory异常。
+且大量的线程回收也会给GC带来很大的压力，延长GC的停顿时间。
+
+比如说  开启10000000个线程的时候
+```
+ for (int i = 0; i <10000000; i++) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+        }
+```
+>Exception in thread "main" java.lang.OutOfMemoryError: unable to create new native thread
+	at java.lang.Thread.start0(Native Method)
+	at java.lang.Thread.start(Thread.java:717)
+	at demo4.ThreadDemo.main(ThreadDemo.java:17)
+
+
+所以千万要警惕这种情况的发生  
+
+
+最后，大量的线程也会抢占cpu的资源，cpu不停的在各个线程上下文切换中,反而没有时间去处理线程运行的时候该处理的任务。 
+
+
+因此，为了避免频繁的创建和销毁线程，让创建的线程进行复用，就有了线程池的概念。  
+线程池里会维护一部分活跃线程，如果有需要，就去线程池里取线程使用，用完即归还到线程池里，免去了创建和销毁线程的开销，且线程池也会线程的数量有一定的限制。
+
+比如说刚刚的代码，通过使用线程池来构建线程
+```  
+ExecutorService executorService= Executors.newFixedThreadPool(10);
+        for (int i = 0; i <10000000; i++) {
+           Thread t= new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        System.out.println("启动线程");
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+            executorService.submit(t);
+        }
+
+    }
+```
+
+可以看到，将不会再产生out of memory的错误，因为每次将只有10个线程在启用，其余的放在线程池内的任务队列里面。
+这是使用线程池的好处之一。
+
+但是线程池也分很多种，要视情况使用，newFixedThreadPool内部的任务队列是无界队列，如果放到的任务过多，最终也会导致内存不足。
+
+
+## jdk的线程池框架分析
+
+jdk提供了一套Executor框架，其本质就是线程池。  
+首先是
+```
+public interface Executor {
+//执行一个实现了Runnable接口的任务
+    void execute(Runnable command);
+
+```
+
+Executor接口是所有线程池的父接口
+
+然后 ExecutorService 继承了Executor接口，初步定义了线程池内的方法
+
+```
+public interface ExecutorService extends Executor {
+
+//关闭线程池，将不会再接收新任务，待所有旧任务完结后就关闭
+    void shutdown();
+    
+   //关闭线程池，不会等待正在执行的任务完成，而是中断全部，并且返回未完成任务的list
+    List<Runnable> shutdownNow();
+
+   //判断线程池是否关闭，如果关闭 返回true
+    boolean isShutdown();
+    //如果在关闭之前，所有任务都已经完结 返回true
+    boolean isTerminated();
+    
+    //等待所有的任务在关闭之前完成，参数为等待的时间,如果完成则返回true
+    boolean awaitTermination(long timeout, TimeUnit unit)
+        throws InterruptedException;
+
+    
+    //核心方法之一，放入一个callable包装的任务，然后立即返回一个future，是异步的任务
+    <T> Future<T> submit(Callable<T> task);
+
+     //核心方法之一，放入一个Runnable包装的任务，立即返回一个future，T为结果类型
+    <T> Future<T> submit(Runnable task, T result);
+
+  
+  //核心方法之一 ，放入runable任务，返回一个future 类型不确定
+    Future<?> submit(Runnable task);
+
+//放入一个任务集合，返回一个future集合
+    <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+        throws InterruptedException;
+
+  
+  //放入任务集合和超时时间和时间单位，返回时间到了之后，已经完成的任务列表
+    <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+                                  long timeout, TimeUnit unit)
+        throws InterruptedException;
+
+    //放入一个callable集合，返回一个已经完成的结果
+    <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+        throws InterruptedException, ExecutionException;
+
+//放入一个callable集合 在超时前返回一个已经完成的结果
+    <T> T invokeAny(Collection<? extends Callable<T>> tasks,
+                    long timeout, TimeUnit unit)
+        throws InterruptedException, ExecutionException, TimeoutException;
+}
+
+```
+
+
+然后 ExecutorService 继承了Executor接口，初步定义了线程池内的方法。然后 ，AbstractExecutorService又实现了ExecutorService里面定义的方法。
+
+
+再最后ThreadPoolExecutor 继承了AbstractExecutorService，里面是更为细致的实现。
+
+最后的最后，jdk定义了一个Executors工厂类，里面对ThreadPoolExecutor进行封装。
+让我们用可以Executors取出来newFixedThreadPool（），newWorkStealingPool（），newSingleThreadExecutor（），newCachedThreadPool（），ScheduledExecutorService（） 等等不同特点的线程池。
+
+
+
 
