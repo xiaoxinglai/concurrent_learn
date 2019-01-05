@@ -1353,5 +1353,160 @@ public interface ExecutorService extends Executor {
 让我们用可以Executors取出来newFixedThreadPool（），newWorkStealingPool（），newSingleThreadExecutor（），newCachedThreadPool（），ScheduledExecutorService（） 等等不同特点的线程池。
 
 
+## jdk提供的线程池介绍
+Executor框架提供了各种类型的线程池。    
+ExecutorService 继承了Executor接口，初步定义了线程池内的方法。然后 ，AbstractExecutorService又实现了ExecutorService里面定义的方法。
+
+再最后ThreadPoolExecutor 继承了AbstractExecutorService，里面是更为细致的实现。
+
+jdk定义了一个Executors工厂类，里面对ThreadPoolExecutor进行封装。 让我们用可以Executors取出来newFixedThreadPool（），newWorkStealingPool（），newSingleThreadExecutor（），newCachedThreadPool（），ScheduledExecutorService（） 等等不同特点的线程池。  
+
+因此 ExecutorService=new ThreadPoolExecutor(...);
+就可以创建出自己定制的线程池。   
+Executors内部也是这样定制的。  
+主要实现如下
+
+```
+public class Executors {
+    
+    /*
+    newFixedThreadPool 固定线程线程数量的线程池，该线程池内的线程数量始终不变，  
+    如果任务到来，内部有空闲线程，则立即执行，如果没有或任务数量大于线程数，多出来的任务，  
+    则会被暂存到任务队列中，待线程空闲，按先入先出的顺序处理。
+    该任务队列是LinkedBlockingQueue，是无界队列，如果任务数量特别多，可能会导致内存不足
+    */
+    public static ExecutorService newFixedThreadPool(int nThreads) {
+        return new ThreadPoolExecutor(nThreads, nThreads,
+                                      0L, TimeUnit.MILLISECONDS,
+                                      new LinkedBlockingQueue<Runnable>());
+    }
+    
+    
+    
+    /*
+    newSingleThreadExecutor(),该方法返回一个只有一个线程的线程池，多出来的任务会被放到任务队列内，  
+    待线程空闲，按先入先出的顺序执行队列中的任务。队列也是无界队列
+    */
+     public static ExecutorService newSingleThreadExecutor() {
+        return new FinalizableDelegatedExecutorService
+            (new ThreadPoolExecutor(1, 1,
+                                    0L, TimeUnit.MILLISECONDS,
+                                    new LinkedBlockingQueue<Runnable>()));
+    }
+    
+    
+    /*
+    newCachedThreadPool() ,该方法返回一个可以根据实际情况调整线程数量的线程池，线程数量不确定，初始是0，最大线程数是Integer.MAX_VALUE，如果有新的空闲线程可以复用，则会优先使用可复用的线程，如果所有线程都在工作，则创建新的线程，所有线程工作结束后，会返回线程池进行复用。但是如果超过60秒空闲，该线程会被销毁。
+    
+    该线程池慎用，在无限制的新增线程的场景下，很可能造成系统内存溢出
+    */
+     public static ExecutorService newCachedThreadPool() {
+        return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+                                      60L, TimeUnit.SECONDS,
+                                      new SynchronousQueue<Runnable>());
+    }
+    
+    
+    
+    /*
+    newSingleThreadScheduledExecutor（） 该方法返回一个线程池大小为1，拓展了在给定时间执行某任务的功能，如在某个固定的延时之后执行，或者周期性执行某任务
+    */
+      public static ScheduledExecutorService newSingleThreadScheduledExecutor() {
+        return new DelegatedScheduledExecutorService
+            (new ScheduledThreadPoolExecutor(1));
+    }
+    
+    
+    /*
+    返回同上，但是可以自己定义线程池大小
+    */
+     public static ScheduledExecutorService newScheduledThreadPool(int corePoolSize) {
+        return new ScheduledThreadPoolExecutor(corePoolSize);
+    }
+
+}
+
+```  
+
+比较特别是newScheduledThreadPool ，这个是个计划任务，会在指定的时间，对任务进行调度。
+
+内部有两个方法。
+```
+ public ScheduledFuture<?> scheduleAtFixedRate(...)   
+ 和
+ public ScheduledFuture<?> scheduleWithFixedDelay(...) 
+
+第一个方法设置的定时任务，是从每个任务开始的时间+间隔 执行
+
+第二个方法是 从每个任务结束的时间+间隔 执行
+
+
+```
+
+
+示例：
+```
+ ScheduledExecutorService executorService= Executors.newScheduledThreadPool(10);
+
+        executorService.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                //打印当前系统秒数
+                System.out.println(System.currentTimeMillis()/1000);
+            }
+        },0,5,TimeUnit.SECONDS);
+
+
+    }
+
+
+```
+输出如下:
+>1546681976  
+1546681981  
+1546681986  
+1546681991  
+1546681996  
+
+可以看到时间间隔是5秒。
+但是请注意！如果任务执行时间 大于调度时间 
+比如说
+```
+ ScheduledExecutorService executorService= Executors.newScheduledThreadPool(10);
+
+        executorService.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                //打印当前系统秒数
+                try {
+                //休眠3秒
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(System.currentTimeMillis()/1000);
+            }
+        },0,2,TimeUnit.SECONDS);
+
+
+    }
+
+```
+
+输出结果：
+>1546682107  
+1546682110    
+1546682113  
+1546682116  
+1546682119
+
+
+这里任务的时间是3秒，但是调度时间间隔是2秒，结果就会变成定时任务3秒，也就是当任务时间大于间隔的时候，会在任务结束之后 立即调用下一次任务。并不会出现任务堆叠出现的情况。
+
+
+如果使用的是scheduleWithFixedDelay(...) 方法，则是从任务结束开始调度，那么时间将变成5秒间隔。
+
+
+
 
 
