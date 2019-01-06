@@ -1509,4 +1509,228 @@ public class Executors {
 
 
 
+## 线程池各个参数详解
+
+一：为什么要自己定义线程池  
+
+虽然jdk提供了几种常用特性的线程池给我们，但是很多时候，我还是需要自己去自定义自己需要特征的线程池。并且阿里巴巴规范手册里面，就是不建议使用jdk的线程池，而是建议程序员手动创建线程池。  
+为什么呢？原文如下  
+【强制】线程池不允许使用 Executors 去创建，而是通过 ThreadPoolExecutor 的方式，**这样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险**
+说明：Executors 返回的线程池对象的弊端如下： 
+ 
+1、FixedThreadPool 和 SingleThreadPool:  
+    允许的请求队列长度为 Integer.MAX_VALUE，可能会堆积大量的请求，从而导致 OOM。 
+ 
+2、CachedThreadPool 和 ScheduledThreadPool:  
+    允许的创建线程数量为 Integer.MAX_VALUE，可能会创建大量的线程，从而导致 OOM
+
+
+但是除此之外，自己通过ThreadPoolExecutor定义线程池还有很多好处。
+比如说，  
+1.自己根据需求定义自己的拒绝策略，如果线程过多，任务过多 如何处理。  
+2.补充完善的线程信息，比如线程名，这一点在将来如果出现线上bug的时候，你会感谢自己，因为你绝不想在线上看到什么threa-1  threa-2 等这种线程爆出的错误，而且是看到自己 “处理xxx线程 错误”，可以一眼看到  
+3.可以通过ThreadPoolExecutor的beforExecute(),
+afterExecute()和terminated()方法去拓展对线程池运行前，运行后，结束后等不同阶段的控制。比如说通过拓展打印日志输出一些有用的调试信息。在故障诊断是非常有用的。  
+4.可以通过自定义线程创建，可以自定义线程名称，组，优先级等信息，包括设置为守护线程等，根据需求。
+
+二： 线程池详解  
+
+
+之前我们在Executors工厂里面看到的方法，
+
+```
+ /*
+    newFixedThreadPool 固定线程线程数量的线程池，该线程池内的线程数量始终不变，  
+    如果任务到来，内部有空闲线程，则立即执行，如果没有或任务数量大于线程数，多出来的任务，  
+    则会被暂存到任务队列中，待线程空闲，按先入先出的顺序处理。
+    该任务队列是LinkedBlockingQueue，是无界队列，如果任务数量特别多，可能会导致内存不足
+    */
+    public static ExecutorService newFixedThreadPool(int nThreads) {
+        return new ThreadPoolExecutor(nThreads, nThreads,
+                                      0L, TimeUnit.MILLISECONDS,
+                                      new LinkedBlockingQueue<Runnable>());
+    }
+    
+    
+    
+    /*
+    newSingleThreadExecutor(),该方法返回一个只有一个线程的线程池，多出来的任务会被放到任务队列内，  
+    待线程空闲，按先入先出的顺序执行队列中的任务。队列也是无界队列
+    */
+     public static ExecutorService newSingleThreadExecutor() {
+        return new FinalizableDelegatedExecutorService
+            (new ThreadPoolExecutor(1, 1,
+                                    0L, TimeUnit.MILLISECONDS,
+                                    new LinkedBlockingQueue<Runnable>()));
+    }
+    
+```
+ 
+可以看到，本质都是对ThreadPoolExecutor进行封装。  
+那么强大的ThreadPoolExecutor又是如何使用？
+先看构造方法定义
+```
+      public ThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+                              ThreadFactory threadFactory,
+                              RejectedExecutionHandler handler) 
+
+```
+1.corePoolSize 指定了线程池里的线程数量  
+2.maximumPoolSize 指定了线程池里的最大线程数量  
+3.keepAliveTime 当线程池线程数量大于corePoolSize时候，多出来的空闲线程，多长时间会被销毁。  
+4.unit 时间单位  
+5.workQueue 任务队列，用于存放提交但是尚未被执行的任务。   
+6.threadFactory 线程工厂，用于创建线程，一般可以用默认的  
+7.handler 拒绝策略，当任务过多时候，如何拒绝任务。  
+
+主要是workQueue和handler的差异比较大  
+
+workQueue指被提交但未执行的任务队列，它是一个BlockingQueue接口的对象，仅用于存放Runnable对象。  
+ThreadPoolExecutor的构造函数中，可使用以下几种BlockingQueue  
+
+1.直接提交队列： 即SynchronousQueue ,这是一个比较特殊的BlockKingQueue， SynchronousQueue没有容量，每一个插入操作都要等待对应的删除操作，反之 一个删除操作都要等待对应的插入操作。 也就是如果使用SynchronousQueue，提交的任务不会被真实保存，而是将新任务交给空闲线程执行，如果没有空闲线程，则创建线程，如果线程数都已经大于最大线程数，则执行拒绝策略。使用这种队列，需要将maximumPoolSize设置的非常大，不然容易执行拒绝策略。比如说
+
+没有最大线程数限制的newCachedThreadPool()
+```
+ public static ExecutorService newCachedThreadPool() {
+        return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+                                      60L, TimeUnit.SECONDS,
+                                      new SynchronousQueue<Runnable>());
+    }
+```
+但是这个在大量任务的时候，会启用等量的线程去处理，有风险造成系统资源不足。
+
+2.有界任务队列。 有界任务队列可以使用ArrayBlockingQueue实现。需要给一个容量参数表示该队列的最大值。当有新任务进来时，如果当前线程数小于corePoolSize，则会创建新线程执行任务。如果大于，则会将任务放到任务队列中，如果任务队列满了，在当前线程小于将maximumPoolSize的情况下，将会创建新线程，如果大于maximumPoolSize，则执行拒绝策略。
+也就是，一阶段，当线程数小于coresize的时候，创建线程；二阶段，当线程任务数大于coresize的时候，放入到队列中；三阶段，队列满，但是还没大于maxsize的时候，创建新线程。 四阶段，队列满，线程数也大于了maxsize, 则执行拒绝策略。  
+可以发现，有界任务队列，会大概率将任务保持在coresize上，只有队列满了，也就是任务非常繁忙的时候，会到达maxsie。
+
+3.无界任务队列。  
+使用linkedBlockingQueue实现，队列最大长度限制为integer.MAX。无界任务队列，不存在任务入队失败的情况， 当任务过来时候，如果线程数小于coresize ，则创建线程，如果大于，则放入到任务队列里面。也就是，线程数几乎会一直维持在coresize大小。FixedThreadPool和singleThreadPool即是如此。 风险在于，如果任务队列里面任务堆积过多，可能导致内存不足。
+4.优先级任务队列。使用PrioriBlockingQueue ，特殊的无界队列，和普通的先进先出队列不同，它是优先级高的先出。   
+
+因此 ，自定义线程池的时候，应该根据实际需要，选择合适的任务队列应对不同的场景。  
+
+
+
+这里给出ThreadPool的核心调度代码
+```
+//runnable为线程内的任务
+ public void execute(Runnable command) {
+ //为null则抛出异常
+        if (command == null)
+            throw new NullPointerException();
+       
+       //获取工作的线程数量
+        int c = ctl.get();
+        //数量小于coresize
+        if (workerCountOf(c) < corePoolSize) {
+        //addWorker 直接执行新线程
+            if (addWorker(command, true))
+                return;
+            c = ctl.get();
+        }
+        
+        //如果大于corsize 则放到等待队列中
+        //workQueue.offer()表示放到队列中
+        if (isRunning(c) && workQueue.offer(command)) {
+            int recheck = ctl.get();
+            if (! isRunning(recheck) && remove(command))
+                reject(command);
+            else if (workerCountOf(recheck) == 0)
+                addWorker(null, false);
+        }
+        //如果放到队列中失败，直接提交给线程池执行
+        //如果提交失败，则执行reject() 拒绝策略
+        else if (!addWorker(command, false))
+            reject(command);
+    }
+```
+
+jdk内置的拒绝策略如下：
+
+拒绝策略  
+1.AbortPolicy  该策略会直接抛出异常，阻止系统正常工作。
+2.CallerRunsPolic 策略：只要线程池未关闭，该策略直接在调用者线程中，运行当前被丢弃的任务，这样做不会真正的丢弃任务，但是 任务提交线程的性能可能会急剧下降。  
+3.DisCardOledestPolicy 策略： 该策略默默地丢弃无法处理的任务，不予任务处理，如果允许任务丢失，这是最好的方法了。  
+
+jdk内置的几种线程池，主要采用的是AbortPolicy 策略，会直接抛出异常,defaultHandler如下。
+
+```
+private static final RejectedExecutionHandler defaultHandler =
+        new AbortPolicy();
+
+```
+
+
+以上内置的策略均实现了RejectedExecutionHandler接口，因此我们也可以实现这个接口，自定义我们自己的策略。
+
+```
+ public static class AbortPolicy implements RejectedExecutionHandler {
+      
+        public AbortPolicy() { }
+
+
+        public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+            throw new RejectedExecutionException("Task " + r.toString() +
+                                                 " rejected from " +
+                                                 e.toString());
+        }
+    }
+```
+
+
+
+最后的最后，所有的线程池里面，线程是从哪里来的？
+答案是ThreadFactory 
+这个是一个接口，里面只有一个方法，用来创建线程
+
+```
+public interface ThreadFactory {
+    Thread newThread(Runnable r);
+}
+```
+
+线程池的默认ThreadFactory如下
+```
+  static class DefaultThreadFactory implements ThreadFactory {
+        private static final AtomicInteger poolNumber = new AtomicInteger(1);
+        private final ThreadGroup group;
+        private final AtomicInteger threadNumber = new AtomicInteger(1);
+        private final String namePrefix;
+
+        DefaultThreadFactory() {
+            SecurityManager s = System.getSecurityManager();
+            group = (s != null) ? s.getThreadGroup() :
+                                  Thread.currentThread().getThreadGroup();
+            namePrefix = "pool-" +
+                          poolNumber.getAndIncrement() +
+                         "-thread-";
+        }
+
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(group, r,
+                                  namePrefix + threadNumber.getAndIncrement(),
+                                  0);
+            if (t.isDaemon())
+                t.setDaemon(false);
+            if (t.getPriority() != Thread.NORM_PRIORITY)
+                t.setPriority(Thread.NORM_PRIORITY);
+            return t;
+        }
+    }
+
+
+```
+
+
+同理我们也可以通过实现ThreadFactory来定义我们自己的线程工厂，比如说自定义线程名称，组，优先级等信息，可以跟着线程池究竟在何时创建了多少线程等等。
+
+
+
+
+
 

@@ -25,22 +25,22 @@ public class ThreadDemo {
 //
 
 
-        ScheduledExecutorService executorService= Executors.newScheduledThreadPool(10);
-
-        executorService.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                //打印当前系统秒数
-                try {
-                    Thread.sleep(3000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                System.out.println(System.currentTimeMillis()/1000);
-            }
-        },0,2,TimeUnit.SECONDS);
-
-
+//        ScheduledExecutorService executorService= Executors.newScheduledThreadPool(10);
+//
+//        executorService.scheduleAtFixedRate(new Runnable() {
+//            @Override
+//            public void run() {
+//                //打印当前系统秒数
+//                try {
+//                    Thread.sleep(3000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+//                System.out.println(System.currentTimeMillis()/1000);
+//            }
+//        },0,2,TimeUnit.SECONDS);
+//
+//
     }
 
 }
