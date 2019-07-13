@@ -24,7 +24,7 @@ public class Player extends Thread {
         new Player(latch).start();
         new Player(latch).start();
         new Player(latch).start();
-        //latch.await();//阻塞等待计数器为0
+        latch.await();//阻塞等待计数器为0
         System.out.println("玩家已到齐, 开始发牌...");
     }
 

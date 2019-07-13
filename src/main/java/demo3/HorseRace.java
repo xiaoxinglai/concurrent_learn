@@ -28,7 +28,7 @@ public class HorseRace implements Runnable {
         //判断是否结束
         for(Horse horse : horses) {
             if(horse.getStrides() >= FINISH_LINE) {
-                System.out.println(horse + "won!");
+                System.out.println(horse + "win!");
                 exec.shutdownNow();
                 return;
             }
