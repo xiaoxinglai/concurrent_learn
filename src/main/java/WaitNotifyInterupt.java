@@ -14,7 +14,7 @@ public class WaitNotifyInterupt {
             synchronized (obj) {
                 try {
                     System.out.println("begin");
-                    obj.wait();
+                    obj.wait(0,0);
                     System.out.println("end");
                 } catch (InterruptedException e) {
                     e.printStackTrace();
