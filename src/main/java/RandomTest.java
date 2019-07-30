@@ -1,4 +1,5 @@
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -17,6 +18,14 @@ public class RandomTest {
         for (int i = 0; i <10 ; i++) {
             //输出10个在0-5之间的随机数 ，包含0 不包含5
             System.out.println(random.nextInt(5));
+        }
+
+
+        //创建一个默认种子的随机数生成器
+        ThreadLocalRandom threadLocalRandom= ThreadLocalRandom.current();
+        for (int i = 0; i <10 ; i++) {
+            //输出10个在0-5之间的随机数 ，包含0 不包含5
+            System.out.println(threadLocalRandom.nextInt(5));
         }
     }
 
