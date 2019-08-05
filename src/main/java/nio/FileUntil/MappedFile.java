@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 
@@ -188,32 +189,37 @@ public class MappedFile {
         MappedFile mappedFile = new MappedFile("text",
                 "/Users/laixiaoxing/Documents/concurrent_learn/src/main/resources/data");
         mappedFile.boundChannelToByteBuffer();
-        MappedByteBuffer mappedByteBuffer = mappedFile.getMappedByteBuffer();
-        System.out.println((char)mappedByteBuffer.get());
-
-        String s = "laixiaoxing";
+        String s = "赖晓星";
         ByteBuffer byteBuffer = ByteBuffer.allocateDirect(100);
-        byteBuffer.put(s.getBytes());
+        int l2=s.getBytes("UTF-8").length;
+        byteBuffer.put(s.getBytes("UTF-8"));
         byteBuffer.flip();
         mappedFile.appendData(byteBuffer);
         mappedFile.flush();
 
         byteBuffer.clear();
-        String ss = "aaaaaaa222";
-        byteBuffer.put(ss.getBytes());
+        String ss = "好好学习 天天向上";
+        int length=ss.getBytes("UTF-8").length;
+        byteBuffer.put(ss.getBytes("UTF-8"));
         byteBuffer.flip();
         mappedFile.appendData(byteBuffer);
         mappedFile.flush();
 
 
+        MappedByteBuffer mappedByteBuffer = mappedFile.getMappedByteBuffer();
+        mappedByteBuffer.flip();
+        byte[] c=new  byte[l2];
+        System.out.println(mappedByteBuffer.get(c));
+        String world=new String(c);
+        System.out.println("字符串："+world);
 
-        byteBuffer.clear();
-        byte[] arr=new byte[10];
-        mappedByteBuffer.get(arr);
-        for (int i = 0; i < arr.length; i++) {
-            System.out.println((char)arr[i]);
 
-        }
+        byte[] cc=new  byte[length];
+        System.out.println(mappedByteBuffer.get(cc));
+        String world2=new String(cc);
+        System.out.println("字符串："+world2);
+
+
     }
 
 
