@@ -17,7 +17,6 @@ public class LockSupportDemo {
     public  static void main(String[] args) {
         LockSupportDemo lockSupportDemo=new LockSupportDemo();
         lockSupportDemo.testPark();
-        Thread
 
     }
 }
